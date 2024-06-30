@@ -349,7 +349,7 @@ PYBIND11_MODULE(polyfempy, m)
 							   init_globals(s);
 							   //    py::scoped_ostream_redirect output;
 							   log_level = std::max(0, std::min(6, log_level));
-							   spdlog::set_level(static_cast<spdlog::level::level_enum>(log_level)); },
+							   s.set_log_level(static_cast<spdlog::level::level_enum>(log_level)); },
 						   "sets polyfem log level, valid value between 0 (all logs) and 6 (no logs)", py::arg("log_level"))
 
 					   .def(
@@ -586,11 +586,7 @@ PYBIND11_MODULE(polyfempy, m)
 					// 				points.rows(), sol, t, tvals, use_sampler, boundary_only);
 
 					// 			vis_bnd = tmp;
-					// 			for (const auto &[name, fun] : tvals)
-					// 				if (name == "von_mises")
-					// 					return fun;
-					// 			throw std::runtime_error("Cauchy stress not found!");
-					// 			return Eigen::MatrixXd(); },
+					// 			return tvals[0].second; },
 					// 	   "returns the von mises stresses on a densly sampled mesh, use 'vismesh_rel_area' to control density", py::arg("solution"), py::arg("t"), py::arg("boundary_only") = bool(false))
 
 					//    .def(
