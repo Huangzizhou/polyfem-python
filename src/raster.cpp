@@ -34,9 +34,9 @@ namespace renderer
 
 		Eigen::Matrix3d Ai = A.inverse();
 
-		for (unsigned i = lx; i <= ux; i++)
+		for (int i = lx; i <= ux; i++)
 		{
-			for (unsigned j = ly; j <= uy; j++)
+			for (int j = ly; j <= uy; j++)
 			{
 
 				Eigen::Vector3d pixel(i + 0.5, j + 0.5, 1);
@@ -90,9 +90,9 @@ namespace renderer
 		double t = -1;
 		double ll = (l1 - l2).squaredNorm();
 
-		for (unsigned i = lx; i <= ux; i++)
+		for (int i = lx; i <= ux; i++)
 		{
-			for (unsigned j = ly; j <= uy; j++)
+			for (int j = ly; j <= uy; j++)
 			{
 
 				Eigen::Vector2f pixel(i + 0.5, j + 0.5);
@@ -132,14 +132,14 @@ namespace renderer
 		const int w = frameBuffer.rows();
 		const int h = frameBuffer.cols();
 		const int comp = 4;
-		const int stride_in_bytes = w * comp;
+		// const int stride_in_bytes = w * comp;
 		image.resize(w * h * comp, 0);
 
-		for (unsigned wi = 0; wi < w; ++wi)
+		for (int wi = 0; wi < w; ++wi)
 		{
-			for (unsigned hi = 0; hi < h; ++hi)
+			for (int hi = 0; hi < h; ++hi)
 			{
-				unsigned hif = h - 1 - hi;
+				int hif = h - 1 - hi;
 				image[(hi * w * 4) + (wi * 4) + 0] = frameBuffer(wi, hif).color[0];
 				image[(hi * w * 4) + (wi * 4) + 1] = frameBuffer(wi, hif).color[1];
 				image[(hi * w * 4) + (wi * 4) + 2] = frameBuffer(wi, hif).color[2];

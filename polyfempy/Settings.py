@@ -14,8 +14,7 @@ class Settings:
 
         self.BDF_order = 1
 
-        self.scalar_formulation = "Laplacian"
-        self.tensor_formulation = "LinearElasticity"
+        self.formulation = "Laplacian"
         self.has_collision = contact_problem
         self.BDF_order = BDF_order
 
@@ -39,7 +38,6 @@ class Settings:
         self.pde = pde
 
         self.selection = None
-        raise RuntimeError("Old Version Deprecated. Use version <0.5.2 on conda for the old interface")
 
     def get_problem(self):
         """Get the problem"""
@@ -62,23 +60,13 @@ class Settings:
 
     def get_pde(self, pde):
         """Get the PDE"""
-        if self._is_scalar:
-            return self.scalar_formulation
-        else:
-            self.tensor_formulation
+        return self.formulation
 
     def set_pde(self, pde):
         """Sets the PDE to solve, use any of the polyfempy.PDEs"""
 
-        if pde == "NonLinearElasticity":
-            pde = "NeoHookean"
-
         self._is_scalar = not polyfempy.polyfempy.is_tensor(pde)
-
-        if self._is_scalar:
-            self.scalar_formulation = pde
-        else:
-            self.tensor_formulation = pde
+        self.formulation = pde
 
     def set_material_params(self, name, value):
         """set the material parameters, for instance set_material_params("E", 200) sets the Young's modulus E to 200. See https://polyfem.github.io/documentation/#formulations for full list"""

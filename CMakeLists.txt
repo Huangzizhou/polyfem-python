@@ -1,6 +1,6 @@
 ################################################################################
 # Check required CMake version
-set(REQUIRED_CMAKE_VERSION "3.14.0")
+set(REQUIRED_CMAKE_VERSION "3.25.0")
 cmake_minimum_required(VERSION ${REQUIRED_CMAKE_VERSION})
 
 if(INPUT_POLYFEMPY_DATA_ROOT)
@@ -13,10 +13,17 @@ if(NOT EXISTS ${POLYFEMPY_DATA_ROOT})
 endif()
 
 project(polyfempy)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 ################################################################################
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/recipes/")
+
+include(polyfem_cpm_cache)
 
 # Color output
 include(UseColors)
