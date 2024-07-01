@@ -4,6 +4,8 @@ from .polyfempy import PDEs
 # from .polyfempy import TensorFormulations
 # from .polyfempy import solve_febio
 # from .polyfempy import solve
+from .polyfempy import CacheLevel
+from .polyfempy import polyfem_command
 
 from .Settings import Settings
 from .Selection import Selection

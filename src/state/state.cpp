@@ -1,10 +1,10 @@
 #include <polyfem/assembler/AssemblerUtils.hpp>
 #include <polyfem/utils/Logger.hpp>
 #include <polyfem/mesh/MeshUtils.hpp>
-// #include <polyfem/mesh/mesh3D/CMesh3D.hpp>
-// #include <polyfem/mesh/mesh2D/CMesh2D.hpp>
 #include <polyfem/assembler/GenericProblem.hpp>
 #include <polyfem/utils/StringUtils.hpp>
+#include <polyfem/io/YamlToJson.hpp>
+#include <polyfem/utils/JSONUtils.hpp>
 
 #include <polyfem/State.hpp>
 #include <polyfem/solver/NLProblem.hpp>
@@ -36,6 +36,7 @@
 #include "differentiable/binding.hpp"
 
 namespace py = pybind11;
+using namespace polyfem;
 
 typedef std::function<Eigen::MatrixXd(double x, double y, double z)> BCFuncV;
 typedef std::function<double(double x, double y, double z)> BCFuncS;
@@ -52,7 +53,38 @@ class PDEs
 
 namespace
 {
-  void init_globals(polyfem::State &state)
+
+  bool load_json(const std::string &json_file, json &out)
+  {
+    std::ifstream file(json_file);
+
+    if (!file.is_open())
+      return false;
+
+    file >> out;
+
+    if (!out.contains("root_path"))
+      out["root_path"] = json_file;
+
+    return true;
+  }
+
+  bool load_yaml(const std::string &yaml_file, json &out)
+  {
+    try
+    {
+      out = io::yaml_file_to_json(yaml_file);
+      if (!out.contains("root_path"))
+        out["root_path"] = yaml_file;
+    }
+    catch (...)
+    {
+      return false;
+    }
+    return true;
+  }
+
+  void init_globals(State &state)
   {
     static bool initialized = false;
 
@@ -326,8 +358,7 @@ void define_pde_types(py::module_ &m)
 
 void define_solver(py::module_ &m)
 {
-  const auto setting_lambda = [](polyfem::State &self,
-                                 const py::object &settings,
+  const auto setting_lambda = [](State &self, const py::object &settings,
                                  bool strict_validation) {
     using namespace polyfem;
 
@@ -337,14 +368,13 @@ void define_solver(py::module_ &m)
     self.init(json::parse(json_string), strict_validation);
   };
 
-  py::class_<polyfem::State>(m, "Solver")
+  py::class_<State>(m, "Solver")
       .def(py::init<>())
 
-      .def("is_tensor",
-           [](const polyfem::State &s) { return s.assembler->is_tensor(); })
+      .def("is_tensor", [](const State &s) { return s.assembler->is_tensor(); })
 
       .def(
-          "settings", [](const polyfem::State &s) { return s.args; },
+          "settings", [](const State &s) { return s.args; },
           "get PDE and problem parameters from the solver")
 
       .def("set_settings", setting_lambda,
@@ -353,7 +383,7 @@ void define_solver(py::module_ &m)
 
       .def(
           "set_log_level",
-          [](polyfem::State &s, int log_level) {
+          [](State &s, int log_level) {
             init_globals(s);
             //    py::scoped_ostream_redirect output;
             log_level = std::max(0, std::min(6, log_level));
@@ -363,17 +393,13 @@ void define_solver(py::module_ &m)
           py::arg("log_level"))
 
       .def(
-          "mesh",
-          [](polyfem::State &s) -> polyfem::mesh::Mesh * {
-            return s.mesh.get();
-          },
+          "mesh", [](State &s) -> mesh::Mesh * { return s.mesh.get(); },
           "Get mesh in simulator")
 
       .def(
           "load_mesh_from_settings",
-          [](polyfem::State &s, const bool normalize_mesh,
-             const double vismesh_rel_area, const int n_refs,
-             const double boundary_id_threshold) {
+          [](State &s, const bool normalize_mesh, const double vismesh_rel_area,
+             const int n_refs, const double boundary_id_threshold) {
             init_globals(s);
             //    py::scoped_ostream_redirect output;
             s.args["geometry"][0]["advanced"]["normalize_mesh"] =
@@ -395,9 +421,9 @@ void define_solver(py::module_ &m)
 
       .def(
           "load_mesh_from_path",
-          [](polyfem::State &s, const std::string &path,
-             const bool normalize_mesh, const double vismesh_rel_area,
-             const int n_refs, const double boundary_id_threshold) {
+          [](State &s, const std::string &path, const bool normalize_mesh,
+             const double vismesh_rel_area, const int n_refs,
+             const double boundary_id_threshold) {
             init_globals(s);
             //    py::scoped_ostream_redirect output;
             s.args["geometry"][0]["mesh"] = path;
@@ -419,10 +445,9 @@ void define_solver(py::module_ &m)
 
       .def(
           "load_mesh_from_path_and_tags",
-          [](polyfem::State &s, const std::string &path,
-             const std::string &bc_tag, const bool normalize_mesh,
-             const double vismesh_rel_area, const int n_refs,
-             const double boundary_id_threshold) {
+          [](State &s, const std::string &path, const std::string &bc_tag,
+             const bool normalize_mesh, const double vismesh_rel_area,
+             const int n_refs, const double boundary_id_threshold) {
             init_globals(s);
             //    py::scoped_ostream_redirect output;
             s.args["geometry"][0]["mesh"] = path;
@@ -445,14 +470,13 @@ void define_solver(py::module_ &m)
 
       .def(
           "set_mesh",
-          [](polyfem::State &s, const Eigen::MatrixXd &V,
-             const Eigen::MatrixXi &F, const bool normalize_mesh,
-             const double vismesh_rel_area, const int n_refs,
-             const double boundary_id_threshold) {
+          [](State &s, const Eigen::MatrixXd &V, const Eigen::MatrixXi &F,
+             const bool normalize_mesh, const double vismesh_rel_area,
+             const int n_refs, const double boundary_id_threshold) {
             init_globals(s);
             //    py::scoped_ostream_redirect output;
 
-            s.mesh = polyfem::mesh::Mesh::create(V, F);
+            s.mesh = mesh::Mesh::create(V, F);
 
             s.args["geometry"][0]["advanced"]["normalize_mesh"] =
                 normalize_mesh;
@@ -473,15 +497,15 @@ void define_solver(py::module_ &m)
 
       .def(
           "set_high_order_mesh",
-          [](polyfem::State &s, const Eigen::MatrixXd &V,
-             const Eigen::MatrixXi &F, const Eigen::MatrixXd &nodes_pos,
+          [](State &s, const Eigen::MatrixXd &V, const Eigen::MatrixXi &F,
+             const Eigen::MatrixXd &nodes_pos,
              const std::vector<std::vector<int>> &nodes_indices,
              const bool normalize_mesh, const double vismesh_rel_area,
              const int n_refs, const double boundary_id_threshold) {
             init_globals(s);
             //    py::scoped_ostream_redirect output;
 
-            s.mesh = polyfem::mesh::Mesh::create(V, F);
+            s.mesh = mesh::Mesh::create(V, F);
             s.mesh->attach_higher_order_nodes(nodes_pos, nodes_indices);
 
             s.args["geometry"][0]["advanced"]["normalize_mesh"] =
@@ -504,9 +528,8 @@ void define_solver(py::module_ &m)
 
       .def(
           "set_boundary_side_set_from_bary",
-          [](polyfem::State &s,
-             const std::function<int(const polyfem::RowVectorNd &)>
-                 &boundary_marker) {
+          [](State &s,
+             const std::function<int(const RowVectorNd &)> &boundary_marker) {
             init_globals(s);
             //    py::scoped_ostream_redirect output;
             s.mesh->compute_boundary_ids(boundary_marker);
@@ -515,9 +538,8 @@ void define_solver(py::module_ &m)
           py::arg("boundary_marker"))
       .def(
           "set_boundary_side_set_from_bary_and_boundary",
-          [](polyfem::State &s,
-             const std::function<int(const polyfem::RowVectorNd &, bool)>
-                 &boundary_marker) {
+          [](State &s, const std::function<int(const RowVectorNd &, bool)>
+                           &boundary_marker) {
             init_globals(s);
             //    py::scoped_ostream_redirect output;
             s.mesh->compute_boundary_ids(boundary_marker);
@@ -526,25 +548,20 @@ void define_solver(py::module_ &m)
           py::arg("boundary_marker"))
       .def(
           "set_boundary_side_set_from_v_ids",
-          [](polyfem::State &s,
-             const std::function<int(const std::vector<int> &, bool)>
-                 &boundary_marker) {
+          [](State &s, const std::function<int(const std::vector<int> &, bool)>
+                           &boundary_marker) {
             init_globals(s);
             //    py::scoped_ostream_redirect output;
             s.mesh->compute_boundary_ids(boundary_marker);
           },
           "Sets the side set for the boundary conditions, the functions takes the sorted list of vertex id and a flag that says if the element is boundary",
           py::arg("boundary_marker"))
-      
-      .def(
-        "nl_problem", [](polyfem::State &s) {
-          return s.solve_data.nl_problem;
-        }
-      )
+
+      .def("nl_problem", [](State &s) { return s.solve_data.nl_problem; })
 
       .def(
           "solve",
-          [](polyfem::State &s) {
+          [](State &s) {
             init_globals(s);
             //    py::scoped_ostream_redirect output;
             s.stats.compute_mesh_stats(*s.mesh);
@@ -564,7 +581,7 @@ void define_solver(py::module_ &m)
           "solve the pde")
       .def(
           "init_timestepping",
-          [](polyfem::State &s, const double t0, const double dt) {
+          [](State &s, const double t0, const double dt) {
             init_globals(s);
             s.stats.compute_mesh_stats(*s.mesh);
 
@@ -577,13 +594,17 @@ void define_solver(py::module_ &m)
             Eigen::MatrixXd sol, pressure;
             s.init_solve(sol, pressure);
             s.init_nonlinear_tensor_solve(sol, t0 + dt);
+            s.cache_transient_adjoint_quantities(
+                0, sol,
+                Eigen::MatrixXd::Zero(s.mesh->dimension(),
+                                      s.mesh->dimension()));
             return sol;
           },
           "initialize timestepping", py::arg("t0"), py::arg("dt"))
       .def(
           "step_in_time",
-          [](polyfem::State &s, Eigen::MatrixXd &sol, const double t0,
-             const double dt, const int t) {
+          [](State &s, Eigen::MatrixXd &sol, const double t0, const double dt,
+             const int t) {
             if (s.assembler->name() == "NavierStokes"
                 || s.assembler->name() == "OperatorSplitting"
                 || s.is_problem_linear() || s.is_homogenization())
@@ -591,6 +612,10 @@ void define_solver(py::module_ &m)
                                        + " is not supported!");
 
             s.solve_tensor_nonlinear(sol, t);
+            s.cache_transient_adjoint_quantities(
+                t, sol,
+                Eigen::MatrixXd::Zero(s.mesh->dimension(),
+                                      s.mesh->dimension()));
 
             s.solve_data.time_integrator->update_quantities(sol);
             s.solve_data.nl_problem->update_quantities(t0 + (t + 1) * dt, sol);
@@ -601,25 +626,20 @@ void define_solver(py::module_ &m)
           "step in time", py::arg("solution"), py::arg("t0"), py::arg("dt"),
           py::arg("t"))
 
-      .def("cache_solution",
-           &polyfem::State::cache_transient_adjoint_quantities,
-           "cache solution at time step t", py::arg("t"), py::arg("solution"),
-           py::arg("macro_displacement_gradient") = Eigen::MatrixXd())
-
       .def(
           "set_cache_level",
-          [](polyfem::State &s, polyfem::solver::CacheLevel level) {
+          [](State &s, solver::CacheLevel level) {
             s.optimization_enabled = level;
           },
           "Set solution caching level", py::arg("cache_level"))
 
       .def(
-          "get_solution_cache", [](polyfem::State &s) { return s.diff_cached; },
+          "get_solution_cache", [](State &s) { return s.diff_cached; },
           "get the cached solution after simulation, this function requires setting CacheLevel before the simulation")
 
       .def(
           "compute_errors",
-          [](polyfem::State &s, Eigen::MatrixXd &sol) {
+          [](State &s, Eigen::MatrixXd &sol) {
             init_globals(s);
             //    py::scoped_ostream_redirect output;
 
@@ -627,33 +647,33 @@ void define_solver(py::module_ &m)
           },
           "compute the error", py::arg("solution"))
 
-      //    .def("export_data", [](polyfem::State &s) {
+      //    .def("export_data", [](State &s) {
       //    py::scoped_ostream_redirect output; s.export_data(); }, "exports all
       //    data specified in the settings")
       .def(
           "export_vtu",
-          [](polyfem::State &s, const Eigen::MatrixXd &sol,
+          [](State &s, const Eigen::MatrixXd &sol,
              const Eigen::MatrixXd &pressure, const double time,
              const double dt, std::string &path, bool boundary_only) {
             //    py::scoped_ostream_redirect output;
             s.args["output"]["advanced"]["vis_boundary_only"] = boundary_only;
             s.out_geom.save_vtu(
                 s.resolve_output_path(path), s, sol, pressure, time, dt,
-                polyfem::io::OutGeometryData::ExportOptions(
-                    s.args, s.mesh->is_linear(), s.problem->is_scalar(),
-                    s.solve_export_to_file),
+                io::OutGeometryData::ExportOptions(s.args, s.mesh->is_linear(),
+                                                   s.problem->is_scalar(),
+                                                   s.solve_export_to_file),
                 s.is_contact_enabled(), s.solution_frames);
           },
           "exports the solution as vtu", py::arg("solution"),
           py::arg("pressure"), py::arg("time"), py::arg("dt"), py::arg("path"),
           py::arg("boundary_only") = bool(false))
-      //    .def("export_wire", [](polyfem::State &s, std::string &path, bool
+      //    .def("export_wire", [](State &s, std::string &path, bool
       //    isolines) { py::scoped_ostream_redirect output; s.save_wire(path,
       //    isolines); }, "exports wireframe of the mesh", py::arg("path"),
       //    py::arg("isolines") = false)
 
       //    .def(
-      // 	   "get_sampled_solution", [](polyfem::State &s, const
+      // 	   "get_sampled_solution", [](State &s, const
       // Eigen::MatrixXd &sol, bool boundary_only) {
       // 		   //    py::scoped_ostream_redirect output;
       // 		   Eigen::MatrixXd points;
@@ -672,7 +692,7 @@ void define_solver(py::module_ &m)
       // 			   ids(i) = s.mesh->get_body_id(el_id(i));
       // 		   }
       // 			const bool use_sampler = true;
-      // 		   polyfem::io::Evaluator::interpolate_function(
+      // 		   io::Evaluator::interpolate_function(
       // 			*s.mesh, s.problem->is_scalar(), s.bases, s.disc_orders,
       // s.polys, s.polys_3d, s.out_geom.ref_element_sampler, points.rows(),
       // sol, fun, use_sampler, boundary_only);
@@ -683,7 +703,7 @@ void define_solver(py::module_ &m)
       // py::arg("boundary_only") = bool(false))
 
       //    .def(
-      // 	   "get_stresses", [](polyfem::State &s, const Eigen::MatrixXd &sol,
+      // 	   "get_stresses", [](State &s, const Eigen::MatrixXd &sol,
       // const double t, bool boundary_only) {
       // 		   //    py::scoped_ostream_redirect output;
       // 		   Eigen::MatrixXd points;
@@ -698,8 +718,8 @@ void define_solver(py::module_ &m)
       // s.geom_bases(), s.polys, s.polys_3d, boundary_only, points, tets,
       // el_id, discr); 		   const bool use_sampler = true;
 
-      // 			std::vector<polyfem::assembler::Assembler::NamedMatrix>
-      // tvals; 			polyfem::io::Evaluator::compute_tensor_value(
+      // 			std::vector<assembler::Assembler::NamedMatrix>
+      // tvals; 			io::Evaluator::compute_tensor_value(
       // *s.mesh, s.problem->is_scalar(), s.bases, s.geom_bases(),
       // s.disc_orders, 				s.polys, s.polys_3d, *s.assembler,
       // s.out_geom.ref_element_sampler, 				points.rows(), sol, t,
@@ -716,7 +736,7 @@ void define_solver(py::module_ &m)
       // py::arg("t"), py::arg("boundary_only") = bool(false))
 
       //    .def(
-      // 	   "get_sampled_mises", [](polyfem::State &s, const Eigen::MatrixXd
+      // 	   "get_sampled_mises", [](State &s, const Eigen::MatrixXd
       // &sol, const double t, bool boundary_only) {
       // 		   //    py::scoped_ostream_redirect output;
       // 		   Eigen::MatrixXd points;
@@ -732,8 +752,8 @@ void define_solver(py::module_ &m)
       // s.geom_bases(), s.polys, s.polys_3d, boundary_only, points, tets,
       // el_id, discr); 		   	const bool use_sampler = true;
 
-      // 			std::vector<polyfem::assembler::Assembler::NamedMatrix>
-      // tvals; 			polyfem::io::Evaluator::compute_scalar_value(
+      // 			std::vector<assembler::Assembler::NamedMatrix>
+      // tvals; 			io::Evaluator::compute_scalar_value(
       // *s.mesh, s.problem->is_scalar(), s.bases, s.geom_bases(),
       // s.disc_orders, 				s.polys, s.polys_3d, *s.assembler,
       // s.out_geom.ref_element_sampler, 				points.rows(), sol, t,
@@ -746,14 +766,14 @@ void define_solver(py::module_ &m)
       // py::arg("t"), py::arg("boundary_only") = bool(false))
 
       //    .def(
-      // 	   "get_sampled_mises_avg", [](polyfem::State &s, const
+      // 	   "get_sampled_mises_avg", [](State &s, const
       // Eigen::MatrixXd &sol, const double t, bool boundary_only) {
       // 		   //    py::scoped_ostream_redirect output;
       // 		   Eigen::MatrixXd points;
       // 		   Eigen::MatrixXi tets;
       // 		   Eigen::MatrixXi el_id;
       // 		   Eigen::MatrixXd discr;
-      // 		   std::vector<polyfem::assembler::Assembler::NamedMatrix> fun,
+      // 		   std::vector<assembler::Assembler::NamedMatrix> fun,
       // tfun;
 
       // 			auto& vis_bnd =
@@ -763,7 +783,7 @@ void define_solver(py::module_ &m)
       // 		   s.out_geom.build_vis_mesh(*s.mesh, s.disc_orders,
       // s.geom_bases(), s.polys, s.polys_3d, boundary_only, points, tets,
       // el_id, discr); 		   const bool use_sampler = true;
-      // 		   polyfem::io::Evaluator::average_grad_based_function(
+      // 		   io::Evaluator::average_grad_based_function(
       // 			*s.mesh, s.problem->is_scalar(), s.n_bases, s.bases,
       // s.geom_bases(), s.disc_orders, 				s.polys, s.polys_3d,
       // *s.assembler, s.out_geom.ref_element_sampler, t,
@@ -778,7 +798,7 @@ void define_solver(py::module_ &m)
       // bool(false))
 
       //    .def(
-      // 	   "get_sampled_traction_forces", [](polyfem::State &s, const bool
+      // 	   "get_sampled_traction_forces", [](State &s, const bool
       // apply_displacement, const bool compute_avg) {
       // 		   //    py::scoped_ostream_redirect output;
 
@@ -796,8 +816,8 @@ void define_solver(py::module_ &m)
       // 		   const double epsilon = 1e-10;
 
       // 		   {
-      // 			   const polyfem::mesh::CMesh3D &mesh3d =
-      // *dynamic_cast<polyfem::mesh::CMesh3D *>(s.mesh.get());
+      // 			   const mesh::CMesh3D &mesh3d =
+      // *dynamic_cast<mesh::CMesh3D *>(s.mesh.get());
       // Eigen::MatrixXd points(mesh3d.n_vertices(), 3); Eigen::MatrixXi
       // tets(mesh3d.n_cells(), 4);
 
@@ -834,7 +854,7 @@ void define_solver(py::module_ &m)
       ////////////////////////////////////////////////////////////////////////////////////////////
       .def(
           "get_sampled_points_frames",
-          [](polyfem::State &s) {
+          [](State &s) {
             //    py::scoped_ostream_redirect output;
             assert(!s.solution_frames.empty());
 
@@ -851,7 +871,7 @@ void define_solver(py::module_ &m)
 
       .def(
           "get_sampled_connectivity_frames",
-          [](polyfem::State &s) {
+          [](State &s) {
             //    py::scoped_ostream_redirect output;
             assert(!s.solution_frames.empty());
 
@@ -866,7 +886,7 @@ void define_solver(py::module_ &m)
 
       .def(
           "get_sampled_solution_frames",
-          [](polyfem::State &s) {
+          [](State &s) {
             //    py::scoped_ostream_redirect output;
             assert(!s.solution_frames.empty());
 
@@ -883,7 +903,7 @@ void define_solver(py::module_ &m)
 
       .def(
           "get_sampled_mises_frames",
-          [](polyfem::State &s) {
+          [](State &s) {
             //    py::scoped_ostream_redirect output;
             assert(!s.solution_frames.empty());
 
@@ -898,7 +918,7 @@ void define_solver(py::module_ &m)
 
       .def(
           "get_sampled_mises_avg_frames",
-          [](polyfem::State &s) {
+          [](State &s) {
             //    py::scoped_ostream_redirect output;
             assert(!s.solution_frames.empty());
 
@@ -913,20 +933,19 @@ void define_solver(py::module_ &m)
 
       .def(
           "get_boundary_sidesets",
-          [](polyfem::State &s) {
+          [](State &s) {
             //    py::scoped_ostream_redirect output;
             Eigen::MatrixXd points;
             Eigen::MatrixXi faces;
             Eigen::MatrixXd sidesets;
 
-            polyfem::io::Evaluator::get_sidesets(*s.mesh, points, faces,
-                                                 sidesets);
+            io::Evaluator::get_sidesets(*s.mesh, points, faces, sidesets);
 
             return py::make_tuple(points, faces, sidesets);
           },
           "exports get the boundary sideset, edges in 2d or trangles in 3d")
       //    .def(
-      // 	   "get_body_ids", [](polyfem::State &s, bool boundary_only) {
+      // 	   "get_body_ids", [](State &s, bool boundary_only) {
       // 		   //    py::scoped_ostream_redirect output;
       // 		   Eigen::MatrixXd points;
       // 		   Eigen::MatrixXi tets;
@@ -949,22 +968,21 @@ void define_solver(py::module_ &m)
       // bool(false))
       .def(
           "update_dirichlet_boundary",
-          [](polyfem::State &self, const int id, const py::object &val,
-             const bool isx, const bool isy, const bool isz,
-             const std::string &interp) {
+          [](State &self, const int id, const py::object &val, const bool isx,
+             const bool isy, const bool isz, const std::string &interp) {
             using namespace polyfem;
             // py::scoped_ostream_redirect output;
             const json json_val = val;
-            if (polyfem::assembler::GenericTensorProblem *prob0 =
-                    dynamic_cast<polyfem::assembler::GenericTensorProblem *>(
+            if (assembler::GenericTensorProblem *prob0 =
+                    dynamic_cast<assembler::GenericTensorProblem *>(
                         self.problem.get()))
             {
               prob0->update_dirichlet_boundary(id, json_val, isx, isy, isz,
                                                interp);
             }
-            else if (polyfem::assembler::GenericScalarProblem *prob1 =
-                         dynamic_cast<polyfem::assembler::GenericScalarProblem
-                                          *>(self.problem.get()))
+            else if (assembler::GenericScalarProblem *prob1 =
+                         dynamic_cast<assembler::GenericScalarProblem *>(
+                             self.problem.get()))
             {
               prob1->update_dirichlet_boundary(id, json_val, interp);
             }
@@ -978,21 +996,20 @@ void define_solver(py::module_ &m)
           py::arg("isz") = bool(true), py::arg("interp") = std::string(""))
       .def(
           "update_neumann_boundary",
-          [](polyfem::State &self, const int id, const py::object &val,
+          [](State &self, const int id, const py::object &val,
              const std::string &interp) {
             using namespace polyfem;
             // py::scoped_ostream_redirect output;
             const json json_val = val;
 
-            if (auto prob0 =
-                    dynamic_cast<polyfem::assembler::GenericTensorProblem *>(
-                        self.problem.get()))
+            if (auto prob0 = dynamic_cast<assembler::GenericTensorProblem *>(
+                    self.problem.get()))
             {
               prob0->update_neumann_boundary(id, json_val, interp);
             }
-            else if (auto prob1 = dynamic_cast<
-                         polyfem::assembler::GenericScalarProblem *>(
-                         self.problem.get()))
+            else if (auto prob1 =
+                         dynamic_cast<assembler::GenericScalarProblem *>(
+                             self.problem.get()))
             {
               prob1->update_neumann_boundary(id, json_val, interp);
             }
@@ -1005,15 +1022,14 @@ void define_solver(py::module_ &m)
           py::arg("interp") = std::string(""))
       .def(
           "update_pressure_boundary",
-          [](polyfem::State &self, const int id, const py::object &val,
+          [](State &self, const int id, const py::object &val,
              const std::string &interp) {
             using namespace polyfem;
             // py::scoped_ostream_redirect output;
             const json json_val = val;
 
-            if (auto prob =
-                    dynamic_cast<polyfem::assembler::GenericTensorProblem *>(
-                        self.problem.get()))
+            if (auto prob = dynamic_cast<assembler::GenericTensorProblem *>(
+                    self.problem.get()))
             {
               prob->update_pressure_boundary(id, json_val, interp);
             }
@@ -1026,7 +1042,7 @@ void define_solver(py::module_ &m)
           py::arg("interp") = std::string(""))
       .def(
           "update_obstacle_displacement",
-          [](polyfem::State &self, const int oid, const py::object &val,
+          [](State &self, const int oid, const py::object &val,
              const std::string &interp) {
             using namespace polyfem;
             // py::scoped_ostream_redirect output;
@@ -1036,7 +1052,7 @@ void define_solver(py::module_ &m)
           "updates obstacle displacement", py::arg("oid"), py::arg("val"),
           py::arg("interp") = std::string(""));
   //    .def(
-  // 	   "render", [](polyfem::State &self, const Eigen::MatrixXd &sol, int
+  // 	   "render", [](State &self, const Eigen::MatrixXd &sol, int
   // width, int height, const Eigen::MatrixXd &camera_positionm, const double
   // camera_fov, const double camera_near, const double camera_far, const bool
   // is_perspective, const Eigen::MatrixXd &lookatm, const Eigen::MatrixXd &upm,
@@ -1072,7 +1088,7 @@ void define_solver(py::module_ &m)
   // py::arg("diffuse_color") = Eigen::MatrixXd(), py::arg("specular_color") =
   // Eigen::MatrixXd(), py::arg("specular_exponent") = double(1))
   //    .def(
-  // 	   "render_extrinsic", [](polyfem::State &, const
+  // 	   "render_extrinsic", [](State &, const
   // std::vector<std::pair<Eigen::MatrixXd, Eigen::MatrixXi>> &vertex_face, int
   // width, int height, const Eigen::MatrixXd &camera_positionm, const double
   // camera_fov, const double camera_near, const double camera_far, const bool
@@ -1082,7 +1098,8 @@ void define_solver(py::module_ &m)
   // Eigen::MatrixXd &diffuse_colorm, const Eigen::MatrixXd &specular_colorm,
   // const double specular_exponent) { 		   int v_count = 0; 		   int
   // f_count = 0; 		   for (const auto& vf_pair : vertex_face) {
-  // v_count += vf_pair.first.rows(); 			   f_count += vf_pair.second.rows();
+  // v_count += vf_pair.first.rows(); 			   f_count +=
+  // vf_pair.second.rows();
   // 		   }
   // 		   Eigen::MatrixXd vertices(v_count, 3);
   // 		   Eigen::MatrixXi faces(f_count, 3);
@@ -1114,99 +1131,61 @@ void define_solver(py::module_ &m)
 void define_solve(py::module_ &m)
 {
 
-  //   m.def(
-  //       "polyfem_command",
-  //       [](const std::string &json_file, const std::string &febio_file,
-  //          const std::string &mesh, const std::string &problem_name,
-  //          const std::string &scalar_formulation,
-  //          const std::string &tensor_formulation, const int n_refs,
-  //          const bool skip_normalization, const std::string &solver,
-  //          const int discr_order, const bool p_ref, const bool
-  //          count_flipped_els, const bool force_linear_geom, const double
-  //          vis_mesh_res, const bool project_to_psd, const int
-  //          nl_solver_rhs_steps, const std::string &output, const std::string
-  //          &vtu, const int log_level, const std::string &log_file, const bool
-  //          is_quiet, const bool export_material_params) {
-  //         json in_args = json({});
+  m.def(
+      "polyfem_command",
+      [](const std::string &json_file, const std::string &yaml_file,
+         const int log_level, const bool strict_validation,
+         const int max_threads, const std::string &output_dir) {
+        json in_args = json({});
 
-  //         if (!json_file.empty())
-  //         {
-  //           std::ifstream file(json_file);
+        const bool ok = !json_file.empty() ? load_json(json_file, in_args)
+                                           : load_yaml(yaml_file, in_args);
 
-  //           if (file.is_open())
-  //             file >> in_args;
-  //           else
-  //             throw "unable to open " + json_file + " file";
-  //           file.close();
-  //         }
-  //         else
-  //         {
-  //           in_args["geometry"][0]["mesh"] = mesh;
-  //           in_args["force_linear_geometry"] = force_linear_geom;
-  //           in_args["n_refs"] = n_refs;
-  //           if (!problem_name.empty())
-  //             in_args["problem"] = problem_name;
-  //           in_args["geometry"][0]["advanced"]["normalize_mesh"] =
-  //               !skip_normalization;
-  //           in_args["project_to_psd"] = project_to_psd;
+        if (!ok)
+          log_and_throw_error(fmt::format("unable to open {} file", json_file));
 
-  //           if (!scalar_formulation.empty())
-  //             in_args["scalar_formulation"] = scalar_formulation;
-  //           if (!tensor_formulation.empty())
-  //             in_args["tensor_formulation"] = tensor_formulation;
-  //           // in_args["mixed_formulation"] = mixed_formulation;
+        json tmp = json::object();
+        tmp["/output/log/level"_json_pointer] = int(log_level);
+        tmp["/solver/max_threads"_json_pointer] = max_threads;
+        if (!output_dir.empty())
+          tmp["/output/directory"_json_pointer] =
+              std::filesystem::absolute(output_dir);
+        assert(tmp.is_object());
+        in_args.merge_patch(tmp);
 
-  //           in_args["discr_order"] = discr_order;
-  //           // in_args["use_spline"] = use_splines;
-  //           in_args["count_flipped_els"] = count_flipped_els;
-  //           in_args["output"] = output;
-  //           in_args["use_p_ref"] = p_ref;
-  //           // in_args["iso_parametric"] = isoparametric;
-  //           // in_args["serendipity"] = serendipity;
+        std::vector<std::string> names;
+        std::vector<Eigen::MatrixXi> cells;
+        std::vector<Eigen::MatrixXd> vertices;
 
-  //           in_args["nl_solver_rhs_steps"] = nl_solver_rhs_steps;
+        State state;
+        state.init(in_args, strict_validation);
+        state.load_mesh(/*non_conforming=*/false, names, cells, vertices);
 
-  //           if (!vtu.empty())
-  //           {
-  //             in_args["export"]["vis_mesh"] = vtu;
-  //             in_args["export"]["wire_mesh"] =
-  //                 polyfem::utils::StringUtils::replace_ext(vtu, "obj");
-  //           }
-  //           if (!solver.empty())
-  //             in_args["solver_type"] = solver;
+        // Mesh was not loaded successfully; load_mesh() logged the error.
+        if (state.mesh == nullptr)
+          log_and_throw_error("Failed to load the mesh!");
 
-  //           if (vis_mesh_res > 0)
-  //             in_args["output"]["paraview"]["vismesh_rel_area"] =
-  //             vis_mesh_res;
+        state.stats.compute_mesh_stats(*state.mesh);
 
-  //           if (export_material_params)
-  //             in_args["export"]["material_params"] = true;
-  //         }
+        state.build_basis();
 
-  //         polyfem::State state;
-  //         state.init_logger(log_file, log_level, is_quiet);
-  //         state.init(in_args);
+        state.assemble_rhs();
+        state.assemble_mass_mat();
 
-  //         if (!febio_file.empty())
-  //           state.load_febio(febio_file, in_args);
-  //         else
-  //           state.load_mesh();
-  //         state.stats.compute_mesh_stats(*state.mesh);
+        Eigen::MatrixXd sol;
+        Eigen::MatrixXd pressure;
 
-  //         state.build_basis();
+        state.solve_problem(sol, pressure);
 
-  //         state.assemble_rhs();
-  //         state.assemble_mass_mat();
+        state.compute_errors(sol);
 
-  //         Eigen::MatrixXd sol, pressure;
-  //         state.solve_problem(sol, pressure);
-
-  //         state.compute_errors(sol);
-
-  //         state.save_json();
-  //         state.export_data(sol, pressure);
-  //       },
-  //       "runs the polyfem command, internal usage");
+        state.save_json(sol);
+        state.export_data(sol, pressure);
+      },
+      "runs the polyfem command, internal usage", py::kw_only(),
+      py::arg("json"), py::arg("yaml") = std::string(""),
+      py::arg("log_level") = int(1), py::arg("strict_validation") = bool(true),
+      py::arg("max_threads") = int(1), py::arg("output_dir") = "");
 
   //   m.def(
   //       "solve_febio",
@@ -1222,7 +1201,7 @@ void define_solve(py::module_ &m)
   //         {
   //           in_args["export"]["paraview"] = output_path;
   //           in_args["export"]["wire_mesh"] =
-  //               polyfem::utils::StringUtils::replace_ext(output_path, "obj");
+  //               utils::StringUtils::replace_ext(output_path, "obj");
   //           in_args["export"]["material_params"] = true;
   //           in_args["export"]["body_ids"] = true;
   //           in_args["export"]["contact_forces"] = true;
@@ -1236,7 +1215,7 @@ void define_solve(py::module_ &m)
   //         if (discr_order == 1 && !in_args.contains("vismesh_rel_area"))
   //           in_args["output"]["paraview"]["vismesh_rel_area"] = 1e10;
 
-  //         polyfem::State state;
+  //         State state;
   //         state.init_logger("", log_level, false);
   //         state.init(in_args);
   //         state.load_febio(febio_file, in_args);
@@ -1263,9 +1242,9 @@ void define_solve(py::module_ &m)
   //          const py::kwargs &kwargs) {
   //         std::string log_file = "";
 
-  //         std::unique_ptr<polyfem::State> res =
-  //             std::make_unique<polyfem::State>();
-  //         polyfem::State &state = *res;
+  //         std::unique_ptr<State> res =
+  //             std::make_unique<State>();
+  //         State &state = *res;
   //         state.init_logger(log_file, log_level, false);
 
   //         json in_args = json(static_cast<py::dict>(kwargs));
@@ -1281,7 +1260,7 @@ void define_solve(py::module_ &m)
   //             {
   //               const auto fun =
   //                   sidesets_func
-  //                       .cast<std::function<int(const polyfem::RowVectorNd
+  //                       .cast<std::function<int(const RowVectorNd
   //                       &)>>();
   //               state.mesh->compute_boundary_ids(fun);
   //               return true;
@@ -1294,7 +1273,7 @@ void define_solve(py::module_ &m)
   //             try
   //             {
   //               const auto fun = sidesets_func.cast<
-  //                   std::function<int(const polyfem::RowVectorNd &,
+  //                   std::function<int(const RowVectorNd &,
   //                   bool)>>();
   //               state.mesh->compute_boundary_ids(fun);
   //               return true;

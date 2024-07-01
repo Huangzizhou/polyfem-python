@@ -1,6 +1,7 @@
 #include <polyfem/solver/DiffCache.hpp>
 #include <polyfem/State.hpp>
 #include "binding.hpp"
+#include <pybind11/eigen.h>
 
 namespace py = pybind11;
 using namespace polyfem::solver;
