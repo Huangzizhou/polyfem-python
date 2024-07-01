@@ -571,24 +571,41 @@ void define_solver(py::module_ &m)
             s.assemble_rhs();
             s.assemble_mass_mat();
 
-            s.solve_export_to_file = false;
-            s.solution_frames.clear();
             Eigen::MatrixXd sol, pressure;
             s.solve_problem(sol, pressure);
-            s.solve_export_to_file = true;
+
+            s.compute_errors(sol);
+
+            s.save_json(sol);
+            s.export_data(sol, pressure);
+
             return py::make_tuple(sol, pressure);
           },
           "solve the pde")
       .def(
-          "init_timestepping",
-          [](State &s, const double t0, const double dt) {
-            init_globals(s);
-            s.stats.compute_mesh_stats(*s.mesh);
+          "build_basis",
+          [](State &s) {
+            if (!s.mesh)
+              throw std::runtime_error("Load mesh first!");
 
             s.build_basis();
+          },
+          "build finite element basis")
+      .def(
+          "assemble",
+          [](State &s) {
+            if (s.bases.size() == 0)
+              throw std::runtime_error("Call build_basis() first!");
 
             s.assemble_rhs();
             s.assemble_mass_mat();
+          },
+          "assemble RHS and mass matrix if needed")
+      .def(
+          "init_timestepping",
+          [](State &s, const double t0, const double dt) {
+            if (!s.solve_data.rhs_assembler || s.mass.size() == 0)
+              throw std::runtime_error("Call assemble() first!");
 
             s.solution_frames.clear();
             Eigen::MatrixXd sol, pressure;
@@ -639,23 +656,19 @@ void define_solver(py::module_ &m)
 
       .def(
           "compute_errors",
-          [](State &s, Eigen::MatrixXd &sol) {
-            init_globals(s);
-            //    py::scoped_ostream_redirect output;
-
-            s.compute_errors(sol);
-          },
+          [](State &s, Eigen::MatrixXd &sol) { s.compute_errors(sol); },
           "compute the error", py::arg("solution"))
 
-      //    .def("export_data", [](State &s) {
-      //    py::scoped_ostream_redirect output; s.export_data(); }, "exports all
-      //    data specified in the settings")
+      .def(
+          "export_data",
+          [](State &s, const Eigen::MatrixXd &sol,
+             const Eigen::MatrixXd &pressure) { s.export_data(sol, pressure); },
+          "exports all data specified in the settings")
       .def(
           "export_vtu",
           [](State &s, const Eigen::MatrixXd &sol,
              const Eigen::MatrixXd &pressure, const double time,
              const double dt, std::string &path, bool boundary_only) {
-            //    py::scoped_ostream_redirect output;
             s.args["output"]["advanced"]["vis_boundary_only"] = boundary_only;
             s.out_geom.save_vtu(
                 s.resolve_output_path(path), s, sol, pressure, time, dt,
@@ -1142,7 +1155,8 @@ void define_solve(py::module_ &m)
                                            : load_yaml(yaml_file, in_args);
 
         if (!ok)
-          log_and_throw_error(fmt::format("unable to open {} file", json_file));
+          throw std::runtime_error(
+              fmt::format("unable to open {} file", json_file));
 
         json tmp = json::object();
         tmp["/output/log/level"_json_pointer] = int(log_level);
@@ -1163,7 +1177,7 @@ void define_solve(py::module_ &m)
 
         // Mesh was not loaded successfully; load_mesh() logged the error.
         if (state.mesh == nullptr)
-          log_and_throw_error("Failed to load the mesh!");
+          throw std::runtime_error("Failed to load the mesh!");
 
         state.stats.compute_mesh_stats(*state.mesh);
 
