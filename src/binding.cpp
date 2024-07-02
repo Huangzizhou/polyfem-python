@@ -30,4 +30,5 @@ PYBIND11_MODULE(polyfempy, m)
   define_nonlinear_problem(m);
 
   define_differentiable_cache(m);
+  define_adjoint(m);
 }

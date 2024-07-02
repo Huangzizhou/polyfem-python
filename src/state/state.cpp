@@ -1,29 +1,22 @@
-#include <polyfem/assembler/AssemblerUtils.hpp>
-#include <polyfem/utils/Logger.hpp>
 #include <polyfem/mesh/MeshUtils.hpp>
+#include <polyfem/assembler/AssemblerUtils.hpp>
 #include <polyfem/assembler/GenericProblem.hpp>
-#include <polyfem/utils/StringUtils.hpp>
+#include <polyfem/io/Evaluator.hpp>
 #include <polyfem/io/YamlToJson.hpp>
+#include <polyfem/utils/Logger.hpp>
+#include <polyfem/utils/StringUtils.hpp>
 #include <polyfem/utils/JSONUtils.hpp>
-
-#include <polyfem/State.hpp>
+#include <polyfem/utils/GeogramUtils.hpp>
 #include <polyfem/solver/NLProblem.hpp>
 #include <polyfem/time_integrator/ImplicitTimeIntegrator.hpp>
-#include <polyfem/io/Evaluator.hpp>
+#include <polyfem/State.hpp>
 
 // #include "raster.hpp"
 
-#include <geogram/basic/command_line.h>
-#include <geogram/basic/command_line_args.h>
-
 #include <igl/boundary_facets.h>
 #include <igl/remove_unreferenced.h>
-#include <stdexcept>
 
-#ifdef USE_TBB
-#include <tbb/task_scheduler_init.h>
-#include <thread>
-#endif
+#include <stdexcept>
 
 #include <pybind11_json/pybind11_json.hpp>
 
@@ -90,25 +83,7 @@ namespace
 
     if (!initialized)
     {
-#ifndef WIN32
-      setenv("GEO_NO_SIGNAL_HANDLER", "1", 1);
-#endif
-
-      GEO::initialize();
-
-#ifdef USE_TBB
-      const size_t MB = 1024 * 1024;
-      const size_t stack_size = 64 * MB;
-      unsigned int num_threads =
-          std::max(1u, std::thread::hardware_concurrency());
-      tbb::task_scheduler_init scheduler(num_threads, stack_size);
-#endif
-
-      // Import standard command line arguments, and custom ones
-      GEO::CmdLine::import_arg_group("standard");
-      GEO::CmdLine::import_arg_group("pre");
-      GEO::CmdLine::import_arg_group("algo");
-
+      state.set_max_threads(1);
       state.init_logger("", spdlog::level::level_enum::info,
                         spdlog::level::level_enum::debug, false);
 
@@ -381,6 +356,8 @@ void define_solver(py::module_ &m)
            "load PDE and problem parameters from the settings", py::arg("json"),
            py::arg("strict_validation") = false)
 
+      .def("ndof", &State::ndof, "Dimension of the solution")
+
       .def(
           "set_log_level",
           [](State &s, int log_level) {
@@ -401,7 +378,6 @@ void define_solver(py::module_ &m)
           [](State &s, const bool normalize_mesh, const double vismesh_rel_area,
              const int n_refs, const double boundary_id_threshold) {
             init_globals(s);
-            //    py::scoped_ostream_redirect output;
             s.args["geometry"][0]["advanced"]["normalize_mesh"] =
                 normalize_mesh;
             s.args["geometry"][0]["surface_selection"] =
@@ -425,7 +401,7 @@ void define_solver(py::module_ &m)
              const double vismesh_rel_area, const int n_refs,
              const double boundary_id_threshold) {
             init_globals(s);
-            //    py::scoped_ostream_redirect output;
+            s.args["geometry"] = R"([{ }])"_json;
             s.args["geometry"][0]["mesh"] = path;
             s.args["geometry"][0]["advanced"]["normalize_mesh"] =
                 normalize_mesh;
@@ -449,7 +425,7 @@ void define_solver(py::module_ &m)
              const bool normalize_mesh, const double vismesh_rel_area,
              const int n_refs, const double boundary_id_threshold) {
             init_globals(s);
-            //    py::scoped_ostream_redirect output;
+            s.args["geometry"] = R"([{ }])"_json;
             s.args["geometry"][0]["mesh"] = path;
             s.args["bc_tag"] = bc_tag;
             s.args["geometry"][0]["advanced"]["normalize_mesh"] =
@@ -471,28 +447,20 @@ void define_solver(py::module_ &m)
       .def(
           "set_mesh",
           [](State &s, const Eigen::MatrixXd &V, const Eigen::MatrixXi &F,
-             const bool normalize_mesh, const double vismesh_rel_area,
              const int n_refs, const double boundary_id_threshold) {
             init_globals(s);
-            //    py::scoped_ostream_redirect output;
-
             s.mesh = mesh::Mesh::create(V, F);
-
-            s.args["geometry"][0]["advanced"]["normalize_mesh"] =
-                normalize_mesh;
+            s.args["geometry"] = R"([{ }])"_json;
             s.args["geometry"][0]["n_refs"] = n_refs;
             s.args["geometry"][0]["surface_selection"] =
                 R"({ "threshold": 0.0 })"_json;
             s.args["geometry"][0]["surface_selection"]["threshold"] =
                 boundary_id_threshold;
-            s.args["output"]["paraview"]["vismesh_rel_area"] = vismesh_rel_area;
 
             s.load_mesh();
           },
           "Loads a mesh from vertices and connectivity", py::arg("vertices"),
-          py::arg("connectivity"), py::arg("normalize_mesh") = bool(false),
-          py::arg("vismesh_rel_area") = double(0.00001),
-          py::arg("n_refs") = int(0),
+          py::arg("connectivity"), py::arg("n_refs") = int(0),
           py::arg("boundary_id_threshold") = double(-1))
 
       .def(
@@ -642,6 +610,32 @@ void define_solver(py::module_ &m)
           },
           "step in time", py::arg("solution"), py::arg("t0"), py::arg("dt"),
           py::arg("t"))
+
+      .def(
+          "solve_adjoint",
+          [](State &s, const Eigen::MatrixXd &adjoint_rhs) {
+            if (adjoint_rhs.cols() != s.diff_cached.size()
+                || adjoint_rhs.rows() != s.diff_cached.u(0).size())
+              throw std::runtime_error("Invalid adjoint_rhs shape!");
+            if (!s.problem->is_time_dependent()
+                && !s.lin_solver_cached) // nonlinear static solve only
+            {
+              Eigen::MatrixXd reduced;
+              for (int i = 0; i < adjoint_rhs.cols(); i++)
+              {
+                Eigen::VectorXd reduced_vec =
+                    s.solve_data.nl_problem->full_to_reduced_grad(
+                        adjoint_rhs.col(i));
+                if (i == 0)
+                  reduced.setZero(reduced_vec.rows(), adjoint_rhs.cols());
+                reduced.col(i) = reduced_vec;
+              }
+              return s.solve_adjoint_cached(reduced);
+            }
+            else
+              return s.solve_adjoint_cached(adjoint_rhs);
+          },
+          "Solve the adjoint equation given the gradient of objective wrt. PDE solution")
 
       .def(
           "set_cache_level",

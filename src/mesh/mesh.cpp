@@ -46,7 +46,25 @@ void define_mesh(py::module_ &m)
            "Set boundary IDs with an array", py::arg("ids"))
 
       .def("set_body_ids", &Mesh::set_body_ids, "Set body IDs with an array",
-           py::arg("ids"));
+           py::arg("ids"))
+     
+     .def("point", &Mesh::point, "Get vertex position",
+          py::arg("vertex_id"))
+
+     .def("set_point", &Mesh::set_point, "Set vertex position",
+          py::arg("vertex_id"), py::arg("position"))
+
+     .def("vertices", [](const Mesh &mesh) {
+          Eigen::MatrixXd points(mesh.n_vertices(), mesh.dimension());
+          for (int i = 0; i < mesh.n_vertices(); i++)
+               points.row(i) = mesh.point(i);
+          return points;
+     }, "Get all vertex positions")
+
+     .def("set_vertices", [](Mesh &mesh, const Eigen::MatrixXd &points) {
+          for (int i = 0; i < mesh.n_vertices(); i++)
+               mesh.set_point(i, points.row(i));
+     }, "Set all vertex positions");
 
   py::class_<CMesh2D, Mesh>(m, "Mesh2D", "");
   py::class_<CMesh3D, Mesh>(m, "Mesh3D", "");

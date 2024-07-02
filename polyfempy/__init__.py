@@ -6,6 +6,7 @@ from .polyfempy import PDEs
 # from .polyfempy import solve
 from .polyfempy import CacheLevel
 from .polyfempy import polyfem_command
+from .polyfempy import shape_derivative
 
 from .Settings import Settings
 from .Selection import Selection
