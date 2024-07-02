@@ -370,8 +370,8 @@ void define_solver(py::module_ &m)
           py::arg("log_level"))
 
       .def(
-          "mesh", [](State &s) -> mesh::Mesh * { return s.mesh.get(); },
-          "Get mesh in simulator")
+          "mesh", [](State &s) -> mesh::Mesh& { return *s.mesh.get(); },
+          "Get mesh in simulator", py::return_value_policy::reference)
 
       .def(
           "load_mesh_from_settings",
