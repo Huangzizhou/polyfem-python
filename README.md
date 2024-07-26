@@ -7,12 +7,13 @@
 [![Anaconda-Server Badge](https://anaconda.org/conda-forge/polyfempy/badges/platforms.svg)](https://anaconda.org/conda-forge/polyfempy)
 [![Anaconda-Server Badge](https://anaconda.org/conda-forge/polyfempy/badges/installer/conda.svg)](https://conda.anaconda.org/conda-forge)
 
-
 The Python bindings are in alpha. Expect a lot of API changes and possible bugs. Use at your own peril!
 
 <br/>
 To use the Python bindings, clone the current repository and use `pip` to install:
+
 ```
+cd polyfem-python/
 pip install .
 ```
 
