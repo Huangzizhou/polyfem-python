@@ -1,9 +1,10 @@
 import polyfempy as pf
 import json
 import numpy as np
-from PIL import Image
 
-root = "~/polyfem/data/contact/examples/2D/unit-tests"
+pf.polyfem_command(json="/Users/zizhouhuang/Desktop/polyfem-python/data/contact/examples/2D/unit-tests/5-squares.json", log_level=2, max_threads=16)
+
+root = "/Users/zizhouhuang/Desktop/polyfem/data/contact/examples/2D/unit-tests"
 with open(root + "/5-squares.json", "r") as f:
     config = json.load(f)
 
@@ -11,6 +12,7 @@ config["root_path"] = root + "/5-squares.json"
 
 solver = pf.Solver()
 solver.set_settings(json.dumps(config), False)
+solver.set_log_level(2)
 solver.load_mesh_from_settings()
 
 config = solver.settings()
@@ -18,9 +20,11 @@ t0 = config["time"]["t0"]
 dt = config["time"]["dt"]
 
 # inits stuff
+solver.build_basis()
+solver.assemble()
 sol = solver.init_timestepping(t0, dt)
 
-for i in range(1, 100):
+for i in range(1, 5):
     
     # substepping
     for t in range(1):

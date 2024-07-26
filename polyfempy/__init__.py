@@ -1,12 +1,4 @@
-from .polyfempy import Solver
-from .polyfempy import PDEs
-# from .polyfempy import ScalarFormulations
-# from .polyfempy import TensorFormulations
-# from .polyfempy import solve_febio
-# from .polyfempy import solve
-from .polyfempy import CacheLevel
-from .polyfempy import polyfem_command
-from .polyfempy import shape_derivative
+from .polyfempy import *
 
 from .Settings import Settings
 from .Selection import Selection

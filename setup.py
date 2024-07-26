@@ -52,10 +52,7 @@ class CMakeBuild(build_ext):
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
                       '-DPYTHON_INCLUDE_DIR=' + python_include_directory,
-                      '-DPOLYSOLVE_WITH_PARDISO=OFF',
                       cholmod_str,
-                      #   '-DPOLYFEM_THREADING=NONE',
-                      '-DPOLYFEM_NO_UI=ON',
                       '-DPOLYSOLVE_WITH_AMGCL=OFF',
                       '-DPOLYSOLVE_WITH_MKL=OFF',
                       '-DPOLYSOLVE_WITH_SPECTRA=OFF']

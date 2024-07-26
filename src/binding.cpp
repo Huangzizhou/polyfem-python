@@ -31,4 +31,6 @@ PYBIND11_MODULE(polyfempy, m)
 
   define_differentiable_cache(m);
   define_adjoint(m);
+  define_objective(m);
+  define_opt_utils(m);
 }

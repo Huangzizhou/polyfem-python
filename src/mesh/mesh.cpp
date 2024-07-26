@@ -45,26 +45,74 @@ void define_mesh(py::module_ &m)
       .def("set_boundary_ids", &Mesh::set_boundary_ids,
            "Set boundary IDs with an array", py::arg("ids"))
 
+      .def("get_boundary_id", &Mesh::get_boundary_id,
+           "Get boundary ID of one boundary primitive", py::arg("primitive"))
+
+      .def(
+          "set_boundary_side_set_from_bary",
+          [](Mesh &mesh,
+             const std::function<int(const RowVectorNd &)> &boundary_marker) {
+            mesh.compute_boundary_ids(boundary_marker);
+          },
+          "Sets the side set for the boundary conditions, the functions takes the barycenter of the boundary (edge or face)",
+          py::arg("boundary_marker"))
+      .def(
+          "set_boundary_side_set_from_bary_and_boundary",
+          [](Mesh &mesh, const std::function<int(const RowVectorNd &, bool)>
+                             &boundary_marker) {
+            mesh.compute_boundary_ids(boundary_marker);
+          },
+          "Sets the side set for the boundary conditions, the functions takes the barycenter of the boundary (edge or face) and a flag that says if the element is boundary",
+          py::arg("boundary_marker"))
+      .def(
+          "set_boundary_side_set_from_v_ids",
+          [](Mesh &mesh,
+             const std::function<int(const std::vector<int> &, bool)>
+                 &boundary_marker) {
+            mesh.compute_boundary_ids(boundary_marker);
+          },
+          "Sets the side set for the boundary conditions, the functions takes the sorted list of vertex id and a flag that says if the element is boundary",
+          py::arg("boundary_marker"))
+
       .def("set_body_ids", &Mesh::set_body_ids, "Set body IDs with an array",
            py::arg("ids"))
-     
-     .def("point", &Mesh::point, "Get vertex position",
-          py::arg("vertex_id"))
 
-     .def("set_point", &Mesh::set_point, "Set vertex position",
-          py::arg("vertex_id"), py::arg("position"))
+      .def("point", &Mesh::point, "Get vertex position", py::arg("vertex_id"))
 
-     .def("vertices", [](const Mesh &mesh) {
-          Eigen::MatrixXd points(mesh.n_vertices(), mesh.dimension());
-          for (int i = 0; i < mesh.n_vertices(); i++)
-               points.row(i) = mesh.point(i);
-          return points;
-     }, "Get all vertex positions")
+      .def("set_point", &Mesh::set_point, "Set vertex position",
+           py::arg("vertex_id"), py::arg("position"))
 
-     .def("set_vertices", [](Mesh &mesh, const Eigen::MatrixXd &points) {
-          for (int i = 0; i < mesh.n_vertices(); i++)
-               mesh.set_point(i, points.row(i));
-     }, "Set all vertex positions");
+      .def(
+          "vertices",
+          [](const Mesh &mesh) {
+            Eigen::MatrixXd points(mesh.n_vertices(), mesh.dimension());
+            for (int i = 0; i < mesh.n_vertices(); i++)
+              points.row(i) = mesh.point(i);
+            return points;
+          },
+          "Get all vertex positions")
+
+      .def(
+          "set_vertices",
+          [](Mesh &mesh, const Eigen::MatrixXd &points) {
+            for (int i = 0; i < mesh.n_vertices(); i++)
+              mesh.set_point(i, points.row(i));
+          },
+          "Set all vertex positions")
+
+      .def(
+          "elements",
+          [](const Mesh &mesh) {
+            Eigen::MatrixXi elements(mesh.n_elements(), mesh.n_cell_vertices(0));
+            for (int e = 0; e < mesh.n_elements(); e++)
+            {
+               assert(mesh.n_cell_vertices(e) == elements.cols());
+               for (int i = 0; i < elements.cols(); i++)
+                    elements(e, i) = mesh.element_vertex(e, i);
+            }
+            return elements;
+          },
+          "Get all elements of the mesh");
 
   py::class_<CMesh2D, Mesh>(m, "Mesh2D", "");
   py::class_<CMesh3D, Mesh>(m, "Mesh3D", "");
