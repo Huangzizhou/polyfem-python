@@ -39,6 +39,20 @@ void define_adjoint(py::module_ &m)
       py::arg("solver"));
 
   m.def(
+      "friction_coefficient_derivative",
+      [](State &state) {
+        Eigen::VectorXd term;
+        if (state.problem->is_time_dependent())
+          AdjointTools::dJ_friction_transient_adjoint_term(state, state.get_adjoint_mat(1), state.get_adjoint_mat(0), term);
+        else
+          log_and_throw_adjoint_error(
+              "Friction coefficient derivative is only supported for transient problems!");
+
+        return term(0);
+      },
+      py::arg("solver"));
+
+  m.def(
       "initial_velocity_derivative",
       [](State &state) {
         const int dim = state.mesh->dimension();

@@ -540,6 +540,11 @@ void define_solver(py::module_ &m)
           "updates obstacle displacement", py::arg("oid"), py::arg("val"),
           py::arg("interp") = std::string(""))
       .def(
+        "set_friction_coefficient", [](State &self, const double mu) {
+          self.args["contact"]["friction_coefficient"] = mu;
+        },
+          "set friction coefficient", py::arg("mu"))
+      .def(
           "set_initial_velocity",
           [](State &self, const int body_id, const Eigen::VectorXd &velocity) {
             if (self.bases.size() == 0)
