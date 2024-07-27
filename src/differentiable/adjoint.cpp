@@ -26,6 +26,19 @@ void define_adjoint(py::module_ &m)
       py::arg("solver"));
 
   m.def(
+      "elastic_material_derivative",
+      [](State &state) {
+        Eigen::VectorXd term;
+        if (state.problem->is_time_dependent())
+          AdjointTools::dJ_material_transient_adjoint_term(state, state.get_adjoint_mat(1), state.get_adjoint_mat(0), term);
+        else
+          AdjointTools::dJ_material_static_adjoint_term(state, state.diff_cached.u(0), state.get_adjoint_mat(0), term);
+
+        return utils::unflatten(term, state.bases.size());
+      },
+      py::arg("solver"));
+
+  m.def(
       "initial_velocity_derivative",
       [](State &state) {
         const int dim = state.mesh->dimension();

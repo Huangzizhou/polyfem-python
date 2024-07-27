@@ -600,7 +600,19 @@ void define_solver(py::module_ &m)
             }
           },
           "set initial displacement for one body", py::arg("body_id"),
-          py::arg("displacement"));
+          py::arg("displacement"))
+      .def(
+          "set_per_element_material",
+          [](State &self, const Eigen::VectorXd &lambda, const Eigen::VectorXd &mu) {
+            if (self.bases.size() == 0)
+              log_and_throw_adjoint_error("Build basis first!");
+
+            assert(lambda.size() == self.bases.size());
+            assert(mu.size() == self.bases.size());
+            self.assembler->update_lame_params(lambda, mu);
+          },
+          "set per-element Lame parameters", py::arg("lambda"),
+          py::arg("mu"));
 }
 
 void define_solve(py::module_ &m)

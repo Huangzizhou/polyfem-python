@@ -37,6 +37,4 @@ void define_objective(py::module_ &m)
 
     m.def("create_objective", &AdjointOptUtils::create_simple_form,
         py::arg("obj_type"), py::arg("param_type"), py::arg("solver"), py::arg("parameters"));
-
-    // obj = std::make_shared<StressNormForm>(var2sim, *(states[args["state"]]), args);
 }
