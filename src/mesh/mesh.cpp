@@ -12,6 +12,8 @@ void define_mesh(py::module_ &m)
 {
   py::class_<Mesh>(m, "Mesh", "Mesh")
 
+      .def("dimension", &Mesh::dimension, "Dimension of the mesh (2 or 3)")
+
       .def("n_elements", &Mesh::n_elements, "Number of elements")
 
       .def("n_boundary_elements", &Mesh::n_boundary_elements,
@@ -94,6 +96,18 @@ void define_mesh(py::module_ &m)
 
       .def(
           "set_vertices",
+          [](Mesh &mesh, const Eigen::VectorXi &ids,
+             const Eigen::MatrixXd &points) {
+            for (int i = 0; i < ids.size(); i++)
+            {
+              assert(ids(i) < mesh.n_vertices());
+              mesh.set_point(ids(i), points.row(i));
+            }
+          },
+          "Set a subset of vertex positions given a list of vertex indices")
+
+      .def(
+          "set_vertices",
           [](Mesh &mesh, const Eigen::MatrixXd &points) {
             for (int i = 0; i < mesh.n_vertices(); i++)
               mesh.set_point(i, points.row(i));
@@ -103,12 +117,13 @@ void define_mesh(py::module_ &m)
       .def(
           "elements",
           [](const Mesh &mesh) {
-            Eigen::MatrixXi elements(mesh.n_elements(), mesh.n_cell_vertices(0));
+            Eigen::MatrixXi elements(mesh.n_elements(),
+                                     mesh.n_cell_vertices(0));
             for (int e = 0; e < mesh.n_elements(); e++)
             {
-               assert(mesh.n_cell_vertices(e) == elements.cols());
-               for (int i = 0; i < elements.cols(); i++)
-                    elements(e, i) = mesh.element_vertex(e, i);
+              assert(mesh.n_cell_vertices(e) == elements.cols());
+              for (int i = 0; i < elements.cols(); i++)
+                elements(e, i) = mesh.element_vertex(e, i);
             }
             return elements;
           },

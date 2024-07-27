@@ -156,6 +156,9 @@ void define_solver(py::module_ &m)
            "load PDE and problem parameters from the settings", py::arg("json"),
            py::arg("strict_validation") = false)
 
+      .def("set_max_threads", &State::set_max_threads, 
+      "set maximum number of threads", py::arg("nthreads"))
+
       .def("ndof", &State::ndof, "Dimension of the solution")
 
       .def("n_bases", [](const State &s) { return s.n_bases; }, "Number of basis")
@@ -398,6 +401,28 @@ void define_solver(py::module_ &m)
           "set_cache_level",
           [](State &s, solver::CacheLevel level) {
             s.optimization_enabled = level;
+            if (level == solver::CacheLevel::Derivatives)
+            {
+              if (s.is_contact_enabled())
+              {
+                if (!s.args["contact"]["use_convergent_formulation"])
+                {
+                  s.args["contact"]["use_convergent_formulation"] = true;
+                  logger().info("Use convergent formulation for differentiable contact...");
+                }
+                if (s.args["/solver/contact/barrier_stiffness"_json_pointer].is_string())
+                {
+                  logger().error("Only constant barrier stiffness is supported in differentiable contact!");
+                }
+              }
+
+              if (s.args.contains("boundary_conditions") && s.args["boundary_conditions"].contains("rhs"))
+              {
+                json rhs = s.args["boundary_conditions"]["rhs"];
+                if ((rhs.is_array() && rhs.size() > 0 && rhs[0].is_string()) || rhs.is_string())
+                  logger().error("Only constant rhs over space is supported in differentiable code!");
+              }
+            }
           },
           "Set solution caching level", py::arg("cache_level"))
 
