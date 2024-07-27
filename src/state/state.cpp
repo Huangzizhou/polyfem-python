@@ -158,6 +158,8 @@ void define_solver(py::module_ &m)
 
       .def("ndof", &State::ndof, "Dimension of the solution")
 
+      .def("n_bases", [](const State &s) { return s.n_bases; }, "Number of basis")
+
       .def(
           "set_log_level",
           [](State &s, int log_level) {
@@ -170,7 +172,7 @@ void define_solver(py::module_ &m)
           py::arg("log_level"))
 
       .def(
-          "mesh", [](State &s) -> mesh::Mesh& { return *s.mesh.get(); },
+          "mesh", [](State &s) -> mesh::Mesh & { return *s.mesh.get(); },
           "Get mesh in simulator", py::return_value_policy::reference)
 
       .def(
@@ -403,14 +405,14 @@ void define_solver(py::module_ &m)
           "get_solution_cache", [](State &s) { return s.diff_cached; },
           "get the cached solution after simulation, this function requires setting CacheLevel before the simulation")
 
-      .def(
-          "get_solutions", [](State &s) {
-            Eigen::MatrixXd sol(s.diff_cached.u(0).size(), s.diff_cached.size());
-            for (int i = 0; i < sol.cols(); i++)
-              sol.col(i) = s.diff_cached.u(i);
-            return sol;
-          }
-      )
+      .def("get_solutions",
+           [](State &s) {
+             Eigen::MatrixXd sol(s.diff_cached.u(0).size(),
+                                 s.diff_cached.size());
+             for (int i = 0; i < sol.cols(); i++)
+               sol.col(i) = s.diff_cached.u(i);
+             return sol;
+           })
 
       .def(
           "compute_errors",
@@ -435,7 +437,8 @@ void define_solver(py::module_ &m)
                 s.is_contact_enabled(), s.solution_frames);
           },
           "exports the solution as vtu", py::arg("path"), py::arg("solution"),
-          py::arg("pressure") = Eigen::MatrixXd(), py::arg("time") = double(0.), py::arg("dt") = double(0.))
+          py::arg("pressure") = Eigen::MatrixXd(), py::arg("time") = double(0.),
+          py::arg("dt") = double(0.))
 
       .def(
           "get_boundary_sidesets",
@@ -535,7 +538,69 @@ void define_solver(py::module_ &m)
             self.obstacle.change_displacement(oid, json_val, interp);
           },
           "updates obstacle displacement", py::arg("oid"), py::arg("val"),
-          py::arg("interp") = std::string(""));
+          py::arg("interp") = std::string(""))
+      .def(
+          "set_initial_velocity",
+          [](State &self, const int body_id, const Eigen::VectorXd &velocity) {
+            if (self.bases.size() == 0)
+              log_and_throw_adjoint_error("Build basis first!");
+
+            if (velocity.size() != self.mesh->dimension())
+              log_and_throw_adjoint_error("Invalid velocity size {}!",
+                                       velocity.size());
+
+            // Initialize initial velocity
+            if (self.initial_vel_update.size() != self.ndof())
+              log_and_throw_adjoint_error("Call init_timestepping first!");
+
+            assert(self.initial_vel_update.size() == self.ndof());
+            // Set initial velocity
+            for (size_t e = 0; e < self.bases.size(); e++)
+            {
+              if (self.mesh->get_body_id(e) == body_id)
+              {
+                const auto &bs = self.bases[e];
+                for (const auto &b : bs.bases)
+                  for (const auto &g : b.global())
+                    for (int d = 0; d < velocity.size(); d++)
+                      self.initial_vel_update(g.index * velocity.size() + d) =
+                          velocity(d);
+              }
+            }
+          },
+          "set initial velocity for one body", py::arg("body_id"),
+          py::arg("velocity"))
+      .def(
+          "set_initial_displacement",
+          [](State &self, const int body_id, const Eigen::VectorXd &disp) {
+            if (self.bases.size() == 0)
+              log_and_throw_adjoint_error("Build basis first!");
+
+            if (disp.size() != self.mesh->dimension())
+              log_and_throw_adjoint_error("Invalid disp size {}!",
+                                       disp.size());
+
+            // Initialize initial displacement
+            if (self.initial_sol_update.size() != self.ndof())
+              log_and_throw_adjoint_error("Call init_timestepping first!");
+
+            assert(self.initial_sol_update.size() == self.ndof());
+            // Set initial displacement
+            for (size_t e = 0; e < self.bases.size(); e++)
+            {
+              if (self.mesh->get_body_id(e) == body_id)
+              {
+                const auto &bs = self.bases[e];
+                for (const auto &b : bs.bases)
+                  for (const auto &g : b.global())
+                    for (int d = 0; d < disp.size(); d++)
+                      self.initial_sol_update(g.index * disp.size() + d) =
+                          disp(d);
+              }
+            }
+          },
+          "set initial displacement for one body", py::arg("body_id"),
+          py::arg("displacement"));
 }
 
 void define_solve(py::module_ &m)
