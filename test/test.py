@@ -12,7 +12,7 @@ config["contact"]["use_convergent_formulation"] = True
 config["root_path"] = root + "/initial-contact.json"
 
 solver = pf.Solver()
-solver.set_settings(json.dumps(config), False)
+solver.set_settings(json.dumps(config), True)
 solver.set_log_level(2)
 solver.load_mesh_from_settings()
 

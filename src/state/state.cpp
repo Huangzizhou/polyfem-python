@@ -280,7 +280,7 @@ void define_solver(py::module_ &m)
           py::arg("n_refs") = int(0),
           py::arg("boundary_id_threshold") = double(-1))
 
-      .def("nl_problem", [](State &s) { return s.solve_data.nl_problem; })
+      .def("nl_problem", [](State &s) { return *(s.solve_data.nl_problem); }, py::return_value_policy::reference)
 
       .def(
           "solve",
