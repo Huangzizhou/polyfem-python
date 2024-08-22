@@ -15,7 +15,7 @@ To use the Python bindings, clone the current repository and use anaconda to ins
 ```
 conda create -n diffipc python=3.9
 conda activate diffipc
-conda install numpy scipy conda-forge::cython
+conda install numpy scipy conda-forge::cython pytorch::pytorch
 
 # optional
 export N_THREADS=16
