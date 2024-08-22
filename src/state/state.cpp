@@ -11,11 +11,6 @@
 #include <polyfem/time_integrator/ImplicitTimeIntegrator.hpp>
 #include <polyfem/State.hpp>
 
-// #include "raster.hpp"
-
-#include <igl/boundary_facets.h>
-#include <igl/remove_unreferenced.h>
-
 #include <stdexcept>
 
 #include <pybind11_json/pybind11_json.hpp>
