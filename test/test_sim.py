@@ -2,9 +2,9 @@ import polyfempy as pf
 import json
 import numpy as np
 
-pf.polyfem_command(json="/Users/zizhouhuang/Desktop/polyfem-python/data/contact/examples/2D/unit-tests/5-squares.json", log_level=2, max_threads=16)
+pf.polyfem_command(json="../data/contact/examples/2D/unit-tests/5-squares.json", log_level=2, max_threads=16)
 
-root = "/Users/zizhouhuang/Desktop/polyfem/data/contact/examples/2D/unit-tests"
+root = "../data/contact/examples/2D/unit-tests"
 with open(root + "/5-squares.json", "r") as f:
     config = json.load(f)
 
