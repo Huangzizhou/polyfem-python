@@ -50,31 +50,31 @@ void define_mesh(py::module_ &m)
       .def("get_boundary_id", &Mesh::get_boundary_id,
            "Get boundary ID of one boundary primitive", py::arg("primitive"))
 
-      .def(
-          "set_boundary_side_set_from_bary",
-          [](Mesh &mesh,
-             const std::function<int(const RowVectorNd &)> &boundary_marker) {
-            mesh.compute_boundary_ids(boundary_marker);
-          },
-          "Sets the side set for the boundary conditions, the functions takes the barycenter of the boundary (edge or face)",
-          py::arg("boundary_marker"))
-      .def(
-          "set_boundary_side_set_from_bary_and_boundary",
-          [](Mesh &mesh, const std::function<int(const RowVectorNd &, bool)>
-                             &boundary_marker) {
-            mesh.compute_boundary_ids(boundary_marker);
-          },
-          "Sets the side set for the boundary conditions, the functions takes the barycenter of the boundary (edge or face) and a flag that says if the element is boundary",
-          py::arg("boundary_marker"))
-      .def(
-          "set_boundary_side_set_from_v_ids",
-          [](Mesh &mesh,
-             const std::function<int(const std::vector<int> &, bool)>
-                 &boundary_marker) {
-            mesh.compute_boundary_ids(boundary_marker);
-          },
-          "Sets the side set for the boundary conditions, the functions takes the sorted list of vertex id and a flag that says if the element is boundary",
-          py::arg("boundary_marker"))
+      // .def(
+      //     "set_boundary_side_set_from_bary",
+      //     [](Mesh &mesh,
+      //        const std::function<int(const RowVectorNd &)> &boundary_marker) {
+      //       mesh.compute_boundary_ids(boundary_marker);
+      //     },
+      //     "Sets the side set for the boundary conditions, the functions takes the barycenter of the boundary (edge or face)",
+      //     py::arg("boundary_marker"))
+      // .def(
+      //     "set_boundary_side_set_from_bary_and_boundary",
+      //     [](Mesh &mesh, const std::function<int(const RowVectorNd &, bool)>
+      //                        &boundary_marker) {
+      //       mesh.compute_boundary_ids(boundary_marker);
+      //     },
+      //     "Sets the side set for the boundary conditions, the functions takes the barycenter of the boundary (edge or face) and a flag that says if the element is boundary",
+      //     py::arg("boundary_marker"))
+      // .def(
+      //     "set_boundary_side_set_from_v_ids",
+      //     [](Mesh &mesh,
+      //        const std::function<int(const std::vector<int> &, bool)>
+      //            &boundary_marker) {
+      //       mesh.compute_boundary_ids(boundary_marker);
+      //     },
+      //     "Sets the side set for the boundary conditions, the functions takes the sorted list of vertex id and a flag that says if the element is boundary",
+      //     py::arg("boundary_marker"))
 
       .def("set_body_ids", &Mesh::set_body_ids, "Set body IDs with an array",
            py::arg("ids"))

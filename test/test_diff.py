@@ -15,10 +15,7 @@ class Simulate(torch.autograd.Function):
             solver.mesh().set_vertices(vertices)
             solver.set_cache_level(pf.CacheLevel.Derivatives) # enable backward derivatives
             solver.solve()
-            cache = solver.get_solution_cache()
-            sol = torch.zeros((solver.ndof(), cache.size()))
-            for t in range(cache.size()):
-                sol[:, t] = torch.tensor(cache.solution(t))
+            sol = torch.tensor(solver.get_solutions())
             solutions.append(sol)
         
         ctx.save_for_backward(vertices)

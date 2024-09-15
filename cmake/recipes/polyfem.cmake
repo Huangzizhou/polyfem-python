@@ -17,4 +17,4 @@ message(STATUS "Third-party: creating target 'polyfem::polyfem'")
 # FetchContent_MakeAvailable(polyfem)
 
 include(CPM)
-CPMAddPackage("gh:polyfem/polyfem#81a01a71c1c1a4605812e49da4dad9f0a9404828")
+CPMAddPackage("gh:polyfem/polyfem#e8bd3d3")
