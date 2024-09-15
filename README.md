@@ -10,11 +10,18 @@
 The Python bindings are in alpha. Expect a lot of API changes and possible bugs. Use at your own peril!
 
 <br/>
-To use the Python bindings, clone the current repository and use `pip` to install:
+To use the Python bindings, clone the current repository and use anaconda to install:
 
 ```
+conda create -n diffipc python=3.9
+conda activate diffipc
+conda install numpy scipy conda-forge::cython pytorch::pytorch
+
+# optional
+export N_THREADS=16
+
 cd polyfem-python/
-pip install .
+pip install . -v
 ```
 
 For full documentation see [https://polyfem.github.io/](https://polyfem.github.io/).

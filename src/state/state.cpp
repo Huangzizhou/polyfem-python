@@ -11,11 +11,6 @@
 #include <polyfem/time_integrator/ImplicitTimeIntegrator.hpp>
 #include <polyfem/State.hpp>
 
-// #include "raster.hpp"
-
-#include <igl/boundary_facets.h>
-#include <igl/remove_unreferenced.h>
-
 #include <stdexcept>
 
 #include <pybind11_json/pybind11_json.hpp>
@@ -285,7 +280,7 @@ void define_solver(py::module_ &m)
           py::arg("n_refs") = int(0),
           py::arg("boundary_id_threshold") = double(-1))
 
-      .def("nl_problem", [](State &s) { return s.solve_data.nl_problem; })
+      .def("nl_problem", [](State &s) { return *(s.solve_data.nl_problem); }, py::return_value_policy::reference)
 
       .def(
           "solve",
