@@ -47,7 +47,8 @@ class CMakeBuild(build_ext):
 
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
-                      '-DPYTHON_INCLUDE_DIR=' + python_include_directory]
+                      '-DPYTHON_INCLUDE_DIR=' + python_include_directory,
+                      '-DPOLYSOLVE_WITH_SPECTRA=OFF']
 
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
@@ -85,6 +86,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="polyfempy",
+    version="0.7",
     description="Polyfem Python Bindings",
     long_description=long_description,
     long_description_content_type="text/markdown",
