@@ -10,8 +10,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
-        python-version: [3.7, 3.8]
-        config: [Debug, Release]
+        python-version: [3.9]
+        config: [Release]
         include:
           - os: ubuntu-latest
             name: Linux
@@ -24,7 +24,7 @@ jobs:
       USE_CHOLMOD: 0
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4.1.6
         with:
           fetch-depth: 10
 
@@ -41,7 +41,8 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          conda install numpy libblas libcblas suitesparse plotly -y
+          # conda install numpy libblas libcblas suitesparse plotly -y
+          conda install numpy scipy conda-forge::cython pytorch::pytorch
 
       - name: Envs (Windows)
         if: runner.os == 'Windows'
@@ -52,16 +53,11 @@ jobs:
           echo "USE_CHOLMOD=0" >> $GITHUB_ENV
           conda init powershell
 
-      - name: Build (Debug)
-        if: matrix.config == 'Debug'
-        run: |
-          python setup.py build --debug install
-
       # windows has problem with memory and 2 passes...
       - name: Build (Release)
         if: matrix.config == 'Release' && runner.os != 'Windows'
         run: |
-          python setup.py build install
+          pip install . -v
 
       # macos segfaults???
       - name: Tests
