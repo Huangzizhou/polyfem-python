@@ -42,7 +42,7 @@ jobs:
       - name: Install Dependencies
         run: |
           # conda install numpy libblas libcblas suitesparse plotly -y
-          conda install numpy scipy conda-forge::cython pytorch::pytorch
+          conda install numpy scipy conda-forge::cython pytorch::pytorch -y
 
       - name: Envs (Windows)
         if: runner.os == 'Windows'
