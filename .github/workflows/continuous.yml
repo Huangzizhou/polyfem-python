@@ -43,6 +43,7 @@ jobs:
         run: |
           # conda install numpy libblas libcblas suitesparse plotly -y
           conda install numpy scipy conda-forge::cython pytorch::pytorch -y
+          pip install --no-binary=pyzmq pyzmq
 
       - name: Envs (Windows)
         if: runner.os == 'Windows'
