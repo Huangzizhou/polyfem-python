@@ -1,10 +1,10 @@
 # %%
 import polyfempy as pf
-import json
+import json, os
 import numpy as np
 
 # %%
-root = "../data/differentiable/input"
+root = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data/differentiable/input")
 with open(root + "/initial-contact.json", "r") as f:
     config = json.load(f)
 
