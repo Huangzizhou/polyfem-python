@@ -151,12 +151,14 @@ void define_solver(py::module_ &m)
            "load PDE and problem parameters from the settings", py::arg("json"),
            py::arg("strict_validation") = false)
 
-      .def("set_max_threads", &State::set_max_threads, 
-      "set maximum number of threads", py::arg("nthreads"))
+      .def("set_max_threads", &State::set_max_threads,
+           "set maximum number of threads", py::arg("nthreads"))
 
       .def("ndof", &State::ndof, "Dimension of the solution")
 
-      .def("n_bases", [](const State &s) { return s.n_bases; }, "Number of basis")
+      .def(
+          "n_bases", [](const State &s) { return s.n_bases; },
+          "Number of basis")
 
       .def(
           "set_log_level",
@@ -180,6 +182,30 @@ void define_solver(py::module_ &m)
             s.load_mesh();
           },
           "Loads a mesh from the 'mesh' field of the json")
+
+      // .def(
+      //     "reload_boundary_conditions",
+      //     [](State &s) {
+      //       auto bc = s.args["boundary_conditions"];
+      //       bc["root_path"] = s.root_path();
+      //       s.problem->clear();
+      //       s.problem->set_parameters(bc);
+      //     },
+      //     "Reload boundary conditions from the json.")
+
+      .def(
+          "update_dirichlet_nodes",
+          [](State &s, const Eigen::VectorXi &node_ids,
+             const Eigen::MatrixXd &nodal_dirichlet) {
+            auto tensor_problem = std::dynamic_pointer_cast<
+                polyfem::assembler::GenericTensorProblem>(s.problem);
+            // if (!s.iso_parametric())
+            //   throw std::runtime_error(
+            //       "Can only update dirichlet nodes for isoparametric.");
+            tensor_problem->update_dirichlet_nodes(s.in_node_to_node, node_ids,
+                                                   nodal_dirichlet);
+          },
+          "Reload boundary conditions from the json.")
 
       .def(
           "load_mesh_from_path",
@@ -249,6 +275,25 @@ void define_solver(py::module_ &m)
           py::arg("connectivity"), py::arg("n_refs") = int(0),
           py::arg("boundary_id_threshold") = double(-1))
 
+      // .def(
+      //     "set_mesh",
+      //     [](State &s, const Eigen::MatrixXd &V, const Eigen::MatrixXi &F,
+      //        const std::string &surface_selections_file,
+      //        const int volume_selection) {
+      //       init_globals(s);
+      //       s.mesh = mesh::Mesh::create(V, F);
+      //       s.args["geometry"] = R"([{ }])"_json;
+      //       s.args["geometry"][0]["surface_selection"] =
+      //           surface_selections_file;
+      //       s.args["geometry"][0]["volume_selection"] = volume_selection;
+
+      //       s.load_mesh();
+      //     },
+      //     "Loads a mesh from vertices and connectivity, specifying surfaces",
+      //     py::arg("vertices"), py::arg("connectivity"),
+      //     py::arg("surface_selections_file") = "",
+      //     py::arg("volume_selection") = int(1))
+
       .def(
           "set_high_order_mesh",
           [](State &s, const Eigen::MatrixXd &V, const Eigen::MatrixXi &F,
@@ -280,11 +325,31 @@ void define_solver(py::module_ &m)
           py::arg("n_refs") = int(0),
           py::arg("boundary_id_threshold") = double(-1))
 
-      .def("nl_problem", [](State &s) { return *(s.solve_data.nl_problem); }, py::return_value_policy::reference)
+      .def(
+          "get_vertices",
+          [](const State &state) {
+            Eigen::MatrixXd vertices;
+            state.get_vertices(vertices);
+            return vertices;
+          },
+          "get the vertices")
+
+      .def(
+          "get_elements",
+          [](const State &state) {
+            Eigen::MatrixXi elements;
+            state.get_elements(elements);
+            return elements;
+          },
+          "get the elements")
+
+      .def(
+          "nl_problem", [](State &s) { return *(s.solve_data.nl_problem); },
+          py::return_value_policy::reference)
 
       .def(
           "solve",
-          [](State &s) {
+          [](State &s, int log_level) {
             init_globals(s);
             //    py::scoped_ostream_redirect output;
             s.stats.compute_mesh_stats(*s.mesh);
@@ -293,6 +358,8 @@ void define_solver(py::module_ &m)
 
             s.assemble_rhs();
             s.assemble_mass_mat();
+
+            s.set_log_level(static_cast<spdlog::level::level_enum>(log_level));
 
             Eigen::MatrixXd sol, pressure;
             s.solve_problem(sol, pressure);
@@ -304,7 +371,7 @@ void define_solver(py::module_ &m)
 
             return py::make_tuple(sol, pressure);
           },
-          "solve the pde")
+          "solve the pde", py::arg("log_level") = int(3))
       .def(
           "build_basis",
           [](State &s) {
@@ -372,8 +439,8 @@ void define_solver(py::module_ &m)
             if (adjoint_rhs.cols() != s.diff_cached.size()
                 || adjoint_rhs.rows() != s.diff_cached.u(0).size())
               throw std::runtime_error("Invalid adjoint_rhs shape!");
-            if (!s.problem->is_time_dependent()
-                && !s.lin_solver_cached) // nonlinear static solve only
+            if (!s.problem->is_time_dependent() && !s.lin_solver_cached
+                && s.is_homogenization()) // nonlinear static solve only
             {
               Eigen::MatrixXd reduced;
               for (int i = 0; i < adjoint_rhs.cols(); i++)
@@ -403,19 +470,25 @@ void define_solver(py::module_ &m)
                 if (!s.args["contact"]["use_convergent_formulation"])
                 {
                   s.args["contact"]["use_convergent_formulation"] = true;
-                  logger().info("Use convergent formulation for differentiable contact...");
+                  logger().info(
+                      "Use convergent formulation for differentiable contact...");
                 }
-                if (s.args["/solver/contact/barrier_stiffness"_json_pointer].is_string())
+                if (s.args["/solver/contact/barrier_stiffness"_json_pointer]
+                        .is_string())
                 {
-                  logger().error("Only constant barrier stiffness is supported in differentiable contact!");
+                  logger().error(
+                      "Only constant barrier stiffness is supported in differentiable contact!");
                 }
               }
 
-              if (s.args.contains("boundary_conditions") && s.args["boundary_conditions"].contains("rhs"))
+              if (s.args.contains("boundary_conditions")
+                  && s.args["boundary_conditions"].contains("rhs"))
               {
                 json rhs = s.args["boundary_conditions"]["rhs"];
-                if ((rhs.is_array() && rhs.size() > 0 && rhs[0].is_string()) || rhs.is_string())
-                  logger().error("Only constant rhs over space is supported in differentiable code!");
+                if ((rhs.is_array() && rhs.size() > 0 && rhs[0].is_string())
+                    || rhs.is_string())
+                  logger().error(
+                      "Only constant rhs over space is supported in differentiable code!");
               }
             }
           },
@@ -460,9 +533,10 @@ void define_solver(py::module_ &m)
           py::arg("pressure") = Eigen::MatrixXd(), py::arg("time") = double(0.),
           py::arg("dt") = double(0.))
       .def(
-        "set_friction_coefficient", [](State &self, const double mu) {
-          self.args["contact"]["friction_coefficient"] = mu;
-        },
+          "set_friction_coefficient",
+          [](State &self, const double mu) {
+            self.args["contact"]["friction_coefficient"] = mu;
+          },
           "set friction coefficient", py::arg("mu"))
       .def(
           "set_initial_velocity",
@@ -472,7 +546,7 @@ void define_solver(py::module_ &m)
 
             if (velocity.size() != self.mesh->dimension())
               log_and_throw_adjoint_error("Invalid velocity size {}!",
-                                       velocity.size());
+                                          velocity.size());
 
             // Initialize initial velocity
             if (self.initial_vel_update.size() != self.ndof())
@@ -502,8 +576,7 @@ void define_solver(py::module_ &m)
               log_and_throw_adjoint_error("Build basis first!");
 
             if (disp.size() != self.mesh->dimension())
-              log_and_throw_adjoint_error("Invalid disp size {}!",
-                                       disp.size());
+              log_and_throw_adjoint_error("Invalid disp size {}!", disp.size());
 
             // Initialize initial displacement
             if (self.initial_sol_update.size() != self.ndof())
@@ -528,7 +601,8 @@ void define_solver(py::module_ &m)
           py::arg("displacement"))
       .def(
           "set_per_element_material",
-          [](State &self, const Eigen::VectorXd &lambda, const Eigen::VectorXd &mu) {
+          [](State &self, const Eigen::VectorXd &lambda,
+             const Eigen::VectorXd &mu) {
             if (self.bases.size() == 0)
               log_and_throw_adjoint_error("Build basis first!");
 
@@ -536,8 +610,7 @@ void define_solver(py::module_ &m)
             assert(mu.size() == self.bases.size());
             self.assembler->update_lame_params(lambda, mu);
           },
-          "set per-element Lame parameters", py::arg("lambda"),
-          py::arg("mu"));
+          "set per-element Lame parameters", py::arg("lambda"), py::arg("mu"));
 }
 
 void define_solve(py::module_ &m)

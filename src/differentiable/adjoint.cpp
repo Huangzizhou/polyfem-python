@@ -30,9 +30,11 @@ void define_adjoint(py::module_ &m)
       [](State &state) {
         Eigen::VectorXd term;
         if (state.problem->is_time_dependent())
-          AdjointTools::dJ_material_transient_adjoint_term(state, state.get_adjoint_mat(1), state.get_adjoint_mat(0), term);
+          AdjointTools::dJ_material_transient_adjoint_term(
+              state, state.get_adjoint_mat(1), state.get_adjoint_mat(0), term);
         else
-          AdjointTools::dJ_material_static_adjoint_term(state, state.diff_cached.u(0), state.get_adjoint_mat(0), term);
+          AdjointTools::dJ_material_static_adjoint_term(
+              state, state.diff_cached.u(0), state.get_adjoint_mat(0), term);
 
         return utils::unflatten(term, state.bases.size());
       },
@@ -43,7 +45,8 @@ void define_adjoint(py::module_ &m)
       [](State &state) {
         Eigen::VectorXd term;
         if (state.problem->is_time_dependent())
-          AdjointTools::dJ_friction_transient_adjoint_term(state, state.get_adjoint_mat(1), state.get_adjoint_mat(0), term);
+          AdjointTools::dJ_friction_transient_adjoint_term(
+              state, state.get_adjoint_mat(1), state.get_adjoint_mat(0), term);
         else
           log_and_throw_adjoint_error(
               "Friction coefficient derivative is only supported for transient problems!");
@@ -88,7 +91,7 @@ void define_adjoint(py::module_ &m)
               vec += term.segment(state.ndof() + g.index * dim, dim);
             }
         }
-        
+
         return map;
       },
       py::arg("solver"));
@@ -129,8 +132,24 @@ void define_adjoint(py::module_ &m)
               vec += term.segment(g.index * dim, dim);
             }
         }
-        
+
         return map;
+      },
+      py::arg("solver"));
+
+  m.def(
+      "dirichlet_derivative",
+      [](State &state) {
+        const int dim = state.mesh->dimension();
+
+        Eigen::VectorXd term;
+        if (state.problem->is_time_dependent())
+          log_and_throw_adjoint_error(
+              "Dirichlet derivative is only supported for static problems!");
+
+        AdjointTools::dJ_dirichlet_static_adjoint_term(
+            state, state.get_adjoint_mat(0), term);
+        return utils::unflatten(term, state.mesh->dimension());
       },
       py::arg("solver"));
 }
