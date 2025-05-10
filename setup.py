@@ -48,7 +48,9 @@ class CMakeBuild(build_ext):
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
                       '-DPYTHON_EXECUTABLE=' + sys.executable,
                       '-DPYTHON_INCLUDE_DIR=' + python_include_directory,
-                      '-DPOLYSOLVE_WITH_SPECTRA=OFF']
+                      '-DPOLYSOLVE_WITH_SPECTRA=OFF',
+                      '-DPOLYSOLVE_WITH_AMGCL=OFF',
+                      '-DCMAKE_POLICY_VERSION_MINIMUM=3.5']
 
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
